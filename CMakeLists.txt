@@ -10,5 +10,6 @@ include(CheckCXXCompilerFlag)
 add_executable(main ./main.cpp)
 
 message(STATUS "ort install previx ${ORT_INSTALL_PREFIX}")
-target_include_directories(main PUBLIC ${ORT_INSTALL_PREFIX}/include)
+target_include_directories(main PUBLIC ${ORT_INSTALL_PREFIX}/include
+    PUBLIC ${EIGEN_HDR_DIR})
 target_link_libraries(main PUBLIC ${ORT_INSTALL_PREFIX}/lib64/libonnxruntime.so)
