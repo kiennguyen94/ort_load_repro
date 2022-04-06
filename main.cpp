@@ -23,19 +23,21 @@ int main(int argc, char* argv[])
     std::vector<float> inputs(sample_size, 0);
     for (uint i = 0; i < sample_size; i++) {
         inputs[i] = distribution(generator);
-        // std::cout << inputs[i] << std::endl;
     }
 
     auto ort_mem = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
     std::vector<int64_t> shape {batch_size, feat_size, seq_size};
-    // Ort::Value in1 = Ort::Value::CreateTensor(ort_mem, inputs.data(), shape.size(), shape.data(), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT);
-    Ort::Value in1 = Ort::Value::CreateTensor(ort_mem, inputs.data(), sample_size * sizeof(float), shape.data(), shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT);
+    std::vector<int64_t> length {seq_size};
+    std::vector<Ort::Value> sess_run_input;
+    sess_run_input.emplace_back(Ort::Value::CreateTensor(ort_mem, inputs.data(), sample_size * sizeof(float), shape.data(), shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT));
+    int64_t length_shape = 1;
+    sess_run_input.emplace_back(Ort::Value::CreateTensor(ort_mem, length.data(), length.size() * sizeof(int64_t), &length_shape, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64));
 
     //
     // OrtEnvPtr ort_env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_VERBOSE);
     OrtEnvPtr ort_env = OrtEnvPtr(new Ort::Env(ORT_LOGGING_LEVEL_VERBOSE));
     Ort::SessionOptions ort_opts;
-    ort_opts.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
+    ort_opts.SetGraphOptimizationLevel(ORT_DISABLE_ALL);
     ort_opts.SetExecutionMode(ORT_SEQUENTIAL);
     ort_opts.SetIntraOpNumThreads(1);
     ort_opts.SetInterOpNumThreads(1);
@@ -53,9 +55,10 @@ int main(int argc, char* argv[])
     std::cout << "time " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << std::endl;
 
     auto run_op = Ort::RunOptions();
-    std::vector<const char*> input_names {"audio_signal"};
+    std::vector<const char*> input_names {"audio_signal", "length"};
     std::vector<const char*> output_names {"logprobs"};
-    auto run_rv = sess->Run(run_op, input_names.data(), &in1, 1, output_names.data(), 1);
+    // auto run_rv = sess->Run(run_op, input_names.data(), &in1, 1, output_names.data(), 1);
+    auto run_rv = sess->Run(run_op, input_names.data(), sess_run_input.data(), 2, output_names.data(), 1);
     assert(run_rv.size() == 1);
     auto& out = run_rv[0];
     auto out_shape_type_info = out.GetTensorTypeAndShapeInfo();
@@ -75,6 +78,7 @@ int main(int argc, char* argv[])
     auto read_size = sizeof(float) * out_num_elem;
     char * buf = new char[read_size];
     data_file.read(buf, read_size);
+    data_file.close();
 
     // compare
     typedef Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> MapCMatXf;
