@@ -1,3 +1,10 @@
+# python repro
+
+```
+tar xvzf ./citrinet.tgz
+python ./final_repo.py
+```
+
 # build
 
 Set `$ORT_INSTALL_PREFIX` to onnxruntime install directory.
